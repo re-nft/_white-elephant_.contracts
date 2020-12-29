@@ -6,16 +6,20 @@ import {
   getNamedAccounts,
 } from 'hardhat';
 
+const advanceToGameStart = async (timestamp: number) => {
+  await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp]);
+  await ethers.provider.send('evm_mine', []);
+};
+
 const setup = deployments.createFixture(async () => {
   await deployments.fixture('Game');
   const {deployer} = await getNamedAccounts();
   const others = await getUnnamedAccounts();
+  const game = await ethers.getContract('Game');
   return {
     deployer,
-    Game: await ethers.getContract('Game'),
-    others: others.map((acc: string) => {
-      return {address: acc};
-    }),
+    Game: game,
+    others: others.map((acc: string) => ({address: acc})),
   };
 });
 
@@ -42,8 +46,8 @@ describe('Game', function () {
   });
 
   // it('adds new whitelisted depositors', async function () {
-  //   const {Game: g} = await setup();
-  //   await g.addDepositors([owner.address]);
-  //   expect(await g.depositors(owner.address)).to.equal(true);
+  //   const {Game: g, deployer: owner} = await setup();
+  //   await g.addDepositors([owner]);
+  //   expect(await g.depositors(owner)).to.equal(true);
   // });
 });
