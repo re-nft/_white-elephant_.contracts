@@ -1,9 +1,9 @@
 {
-  "name": "template-ethereum-contracts",
+  "name": "white-elephant-contracts",
   "version": "0.1.0",
-  "description": "Template to develop ethereum smart contracts",
-  "repository": "github:wighawag/template-ethereum-contracts",
-  "author": "wighawag",
+  "description": "White Elephant style NFT game for end of year 2020",
+  "repository": "github:RENTFT/white-elephant-contracts",
+  "author": "nazariyv",
   "license": "MIT",
   "keywords": [
     "ethereum",
