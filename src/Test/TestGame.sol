@@ -11,6 +11,7 @@ import "hardhat/console.sol";
 
 contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
     event Received(address, uint256);
+    event PrizeTransfer(address to, address nftishka, uint256 id, uint256 prizeIx);
     struct Nft {
         address adr;
         uint256 id;
@@ -100,20 +101,67 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         lastAction = uint32(now);
     }
 
+    /// @param _sender - index from playersOrder arr that you are stealing from
+    /// @param _from - index from playersOrder who to steal from
+    /// @param missed - how many players missed their turn since lastAction
     function steal(
-        uint8 sender,
-        uint8 from,
+        uint8 _sender,
+        uint8 _from,
         uint8 missed
     ) external nonReentrant youShallNotPatheth(missed) {
-        require(players.addresses[sender] == msg.sender, "sender is not valid");
+        require(_sender > _from, "cant steal from someone who unwrapped after");
+        uint8 sender = playersOrder[_sender]; // strictly greater than zero
+        uint8 from = playersOrder[_from]; // strictly greater than zero
         require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
+        require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(spaws[from] == 0, "cant steal from them again");
-        // theoretically impossible, but being extra cautious doesnt hurt
         require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
         swaps[sender] = from;
         spaws[from] = sender;
         currPlayer += missed + 1;
         lastAction = uint32(now);
+    }
+
+    /// @param orderPlayers - given the index of the player (from players)
+    /// gives their turn number
+    /// @param startIx - index from which to start looping the prizes
+    /// @param endIx - index on which to end looping the prizes (exclusive)
+    /// @dev start and end indices would be useful in case we hit
+    /// the block gas limit, or we want to better control our transaction
+    /// costs
+    function finito(
+        uint8[255] calldata orderPlayers,
+        uint8 startIx,
+        uint8 endIx
+    ) external onlyOwner {
+        // take into account the steals, the skips and unwraps
+        // distribute the NFT prizes to their rightful owners
+        // players: [0x123, 0x223, 0x465, 0xf21]. First, 0x123 bought, then 0x223 etc.
+        // playersOrder: [4,1,3,2]. 4th buyer goes first, 1st buy goest second, ...
+        // swaps: { 2: 1, 4: 3 }. Second player (0x223) stole from first, and
+        // fourth stole from third. In essence, 2-1 swapped and then 4-3 swapped
+        for (uint8 i = startIx; i < endIx; i++) {
+            uint8 prizeIx = 0;
+            // verify that the prize is correct
+            uint8 stoleIx = swaps[i];
+            uint8 stealerIx = spaws[i];
+            console.log("stoleIx %s, stealerIx %s", stoleIx, stealerIx);
+            if (stoleIx == 0 && stealerIx == 0) {
+                prizeIx = orderPlayers[i];
+            }
+            // if the player stole
+            if (stoleIx != 0) {
+                prizeIx = swaps[i];
+            }
+            // if the player was stolen from, then the prize they receive must be from their stealer
+            // since i is the index of the player in players, we trivially have
+            if (stealerIx != 0) {
+                prizeIx = spaws[i];
+            }
+            // transfer the prize
+            // ERC721(nfts[prizeIx].adr).transferFrom(address(this), players.addresses[i], nfts[prizeIx].id);
+            emit PrizeTransfer(players.addresses[i], nfts[prizeIx].adr, nfts[prizeIx].id, prizeIx);
+        }
     }
 
     function onERC721Received(

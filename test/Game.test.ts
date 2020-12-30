@@ -232,7 +232,7 @@ describe('Game', function () {
       playersOrder[1] = 1;
       await g.testSetPlayersOrder(playersOrder);
       await c.unwrap(0);
-      await g.steal(1, 2, 0);
+      await g.steal(1, 0, 0);
       // currPlayer is zero indexed
       expect(await g.currPlayer()).to.be.equal(2);
       lastBlock = await ethers.provider.getBlock('latest');
@@ -258,14 +258,14 @@ describe('Game', function () {
       playersOrder[2] = 3;
       await g.testSetPlayersOrder(playersOrder);
       await c.unwrap(0);
-      await g.steal(1, 2, 0);
+      await g.steal(1, 0, 0);
       // currPlayer is zero indexed
       expect(await g.currPlayer()).to.be.equal(2);
       lastBlock = await ethers.provider.getBlock('latest');
       expect(await g.lastAction()).to.be.equal(lastBlock.timestamp);
       expect(await g.swaps(1)).to.be.equal(2);
       expect(await g.spaws(2)).to.be.equal(1);
-      await expect(d.steal(3, 2, 0)).to.be.revertedWith(
+      await expect(d.steal(2, 0, 0)).to.be.revertedWith(
         'cant steal from them again'
       );
     });
@@ -315,6 +315,44 @@ describe('Game', function () {
       ).to.be.equal(ethers.utils.parseEther('1'));
     });
 
-    // it('distributes NFTs to players', async function () {});
+    it('distributes NFTs to players chivalrously', async function () {
+      // 20 players. Simulating the worst case here in terms of time complexity
+      // such a case would occur if whoever stole from you, was stolen from as well
+      // and then that person was stolen from, and so on. And this is the case as
+      // much as possible. When would this happen?
+      // Let's note that the order in which players take turns is not important here
+      // This implies that the playersOrder is arbitrary and we can set it to be
+      // equal to the players. i.e. each person takes turn as per who bought
+      // ticket the earliest
+      const {TestGame: g, others} = await setup();
+      const ticketPrice = await g.ticketPrice();
+      const cs = [];
+      for (let i = 0; i < others.length; i++) {
+        cs.push(await ethers.getContract('TestGame', others[i].address));
+      }
+      const lastBlock = await ethers.provider.getBlock('latest');
+      const timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      for (let i = 0; i < cs.length; i++) {
+        await cs[i].buyTicket({value: ticketPrice.toString()});
+      }
+      let i = 0;
+      const po = Array(255);
+      while (i < 255) po[i++] = i;
+      await g.testSetPlayersOrder(po);
+      await cs[0].unwrap(0);
+      for (let i = 1; i < cs.length; i++) await cs[i].steal(i, i - 1, 0);
+      const tx = await g.finito(po, 0, cs.length);
+      const {events} = await tx.wait();
+      for (let i = 0; i < events.length; i++) {
+        if (i === events.length - 1) {
+          expect(events[i].args.prizeIx).to.equal(0);
+          break;
+        }
+        const event = events[i];
+        const {prizeIx} = event.args;
+        expect(prizeIx).to.equal(i + 1);
+      }
+    });
   });
 });

@@ -26,6 +26,7 @@ import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
  */
 contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     event Received(address, uint256);
+    event PrizeTransfer(address to, address nftishka, uint256 id, uint256 nftIx);
     struct Nft {
         address adr;
         uint256 id;
@@ -44,13 +45,12 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     address private chainlinkVrfCoordinator = 0xdD3782915140c8f3b190B5D67eAc6dc5760C46E9;
     address private chainlinkLinkToken = 0xa36085F69e2889c224210F603D836748e7dC0088;
     bytes32 private chainlinkKeyHash = 0x6c3699283bda56ad74f6b855546325b68d482e983852a7a82979cc4807b641f4;
-    uint256 private chainlinkCallFee = 0.1 * 10**18;
     uint256 public ticketPrice = 0.0001 ether;
     /// @dev before this date, you can be buying tickets. After this date, unwrapping begins
     /// @dev 2021 January 3rd 23:59:59 GMT
     uint32 public timeBeforeGameStart = 1609718399;
 
-    /// order in which the players take turns. This gets set after gameStart once everyone has randomness associated to them
+    /// @dev order in which the players take turns. This gets set after gameStart once everyone has randomness associated to them
     /// an example of this is 231, 1, 21, 3, ...; the numbers signify the addresses at
     /// indices 231, 1, 3 and so on from the players array. We avoid having a map
     /// of indices like 1, 2, 3 and so on to addresses which are then duplicated
@@ -59,8 +59,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// 0 (default value of uninitialised uint8).
     /// Interpretation of this is that if at index 0 in playersOrder we have index 3
     /// then that means that player players.addresses[3] is the one to go first
-    uint8[255] public playersOrder;
-    /// Chainlink entropies
+    uint8[255] private playersOrder;
+    /// @dev Chainlink entropies
     Entropies private entropies;
     /// this array tracks the addresses of all the players that will participate in the game
     /// these guys bought the ticket before `gameStart`
@@ -77,12 +77,12 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// for onlyOwner use only, this lets the contract know who is allowed to
     /// deposit the NFTs into the prize pool
     mapping(address => bool) public depositors;
-    /// flag that indicates if the game is ready to start
+    /// @dev flag that indicates if the game is ready to start
     /// after people bought the tickets, owners initialize the
     /// contract with chainlink entropy. Before this is done
     /// the game cannot begin
     bool private initComplete = false;
-    /// tracks the last time a valid steal or unwrap call was made
+    /// @dev tracks the last time a valid steal or unwrap call was made
     /// this serves to signal if any of the players missed their turn
     /// when a player misses their turn, they forego the ability to
     /// steal from someone who unwrapped before them
@@ -150,11 +150,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     }
 
     constructor() public VRFConsumerBase(chainlinkVrfCoordinator, chainlinkLinkToken) {
-        // keyHash = CHAINLINK_REQUEST_KEY_HASH;
-        // fee = CHAINLINK_LINK_CALL_FEE;
         depositors[0x465DCa9995D6c2a81A9Be80fBCeD5a770dEE3daE] = true;
         depositors[0x426923E98e347158D5C471a9391edaEa95516473] = true;
-        // depositors[0x63A556c75443b176b5A4078e929e38bEb37a1ff2] = true;
     }
 
     function deposit(ERC721[] calldata _nfts, uint256[] calldata tokenIds) public onlyWhitelisted {
@@ -180,16 +177,19 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         lastAction = uint32(now);
     }
 
-    /// @param sender - index from players arr that you are stealing from
-    /// @param from - index from players who to steal from
+    /// @param _sender - index from playersOrder arr that you are stealing from
+    /// @param _from - index from playersOrder who to steal from
     /// @param missed - how many players missed their turn since lastAction
     function steal(
-        uint8 sender,
-        uint8 from,
+        uint8 _sender,
+        uint8 _from,
         uint8 missed
     ) external afterGameStart nonReentrant youShallNotPatheth(missed) {
-        require(players.addresses[sender] == msg.sender, "sender is not valid");
+        require(_sender > _from, "cant steal from someone who unwrapped after");
+        uint8 sender = playersOrder[_sender];
+        uint8 from = playersOrder[_from];
         require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
+        require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(spaws[from] == 0, "cant steal from them again");
         require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
         swaps[sender] = from;
@@ -198,10 +198,46 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         lastAction = uint32(now);
     }
 
-    // function finito() external onlyOwner {
-    // take into account the steals, the skips and unwraps
-    // distribute the NFT prizes to their rightful owners
-    // }
+    /// @param orderPlayers - given the index of the player (from players)
+    /// gives their turn number
+    /// @param startIx - index from which to start looping the prizes
+    /// @param endIx - index on which to end looping the prizes (exclusive)
+    /// @dev start and end indices would be useful in case we hit
+    /// the block gas limit, or we want to better control our transaction
+    /// costs
+    function finito(
+        uint8[255] calldata orderPlayers,
+        uint8 startIx,
+        uint8 endIx
+    ) external onlyOwner {
+        // take into account the steals, the skips and unwraps
+        // distribute the NFT prizes to their rightful owners
+        // players: [0x123, 0x223, 0x465, 0xf21]. First, 0x123 bought, then 0x223 etc.
+        // playersOrder: [4,1,3,2]. 4th buyer goes first, 1st buy goest second, ...
+        // swaps: { 2: 1, 4: 3 }. Second player (0x223) stole from first, and
+        // fourth stole from third. In essence, 2-1 swapped and then 4-3 swapped
+        for (uint8 i = startIx; i < endIx; i++) {
+            uint8 prizeIx = 0;
+            // verify that the prize is correct
+            uint8 stoleIx = swaps[i];
+            uint8 stealerIx = spaws[i];
+            if (stoleIx == 0 && stealerIx == 0) {
+                prizeIx = orderPlayers[i];
+            }
+            // if the player stole
+            if (stoleIx != 0) {
+                prizeIx = swaps[i];
+            }
+            // if the player was stolen from, then the prize they receive must be from their stealer
+            // since i is the index of the player in players, we trivially have
+            if (stealerIx != 0) {
+                prizeIx = spaws[i];
+            }
+            // transfer the prize
+            ERC721(nfts[prizeIx].adr).transferFrom(address(this), players.addresses[i], nfts[prizeIx].id);
+            emit PrizeTransfer(players.addresses[i], nfts[prizeIx].adr, nfts[prizeIx].id, prizeIx);
+        }
+    }
 
     /// Will revert the safeTransfer
     /// on transfer nothing happens, the NFT is not added to the prize pool
@@ -239,11 +275,13 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
 
     /// Randomness is queried afterGameStart but before initComplete (flag)
     function getRandomness(uint256 ourEntropy) internal returns (bytes32 requestId) {
+        uint256 chainlinkCallFee = 0.1 * 10**18;
         require(LINK.balanceOf(address(this)) >= chainlinkCallFee, "not enough LINK");
         requestId = requestRandomness(chainlinkKeyHash, chainlinkCallFee, ourEntropy);
     }
 
     receive() external payable {
+        // thanks a bunch
         emit Received(msg.sender, msg.value);
     }
 
