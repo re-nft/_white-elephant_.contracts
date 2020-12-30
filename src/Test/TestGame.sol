@@ -65,10 +65,10 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         depositors[0x426923E98e347158D5C471a9391edaEa95516473] = true;
         // each entropy is 32 chunks of uint8
         // so the below is sufficient randomness for 64 players
-        entropies = [
-            11579208923731619542357098500868790785326984665640564039457584007913129639935,
-            11579208923731619542357098008687907853269984665640564039457584007913129639935
-        ];
+        // entropies = [
+        //     11579208923731619542357098500868790785326984665640564039457584007913129639935,
+        //     11579208923731619542357098008687907853269984665640564039457584007913129639935
+        // ];
     }
 
     function deposit(ERC721[] calldata _nfts, uint256[] calldata tokenIds) public onlyWhitelisted {
@@ -132,5 +132,13 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
 
     function player(uint8 i) external view returns (address, uint8) {
         return (players.addresses[i], players.numPlayers);
+    }
+
+    function testSetLastAction(uint32 _lastAction) external onlyOwner {
+        lastAction = _lastAction;
+    }
+
+    function testSetPlayersOrder(uint8[256] calldata _playersOrder) external onlyOwner {
+        playersOrder = _playersOrder;
     }
 }

@@ -11,6 +11,11 @@ const advanceToGameStart = async (timestamp: number) => {
   await ethers.provider.send('evm_mine', []);
 };
 
+const advanceTime = async () => {
+  await ethers.provider.send('evm_increaseTime', []);
+  await ethers.provider.send('evm_mine', []);
+};
+
 const setup = deployments.createFixture(async () => {
   await deployments.fixture('Game');
   await deployments.fixture('TestGame');
@@ -105,6 +110,16 @@ describe('Game', function () {
   });
 
   context('Game Start', async function () {
-    it('unwraps', async function () {});
+    it('unwraps', async function () {
+      const {TestGame: g} = await setup();
+      await advanceToGameStart;
+      const lastBlock = await ethers.provider.getBlock('latest');
+      const timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      const ticketPrice = await g.ticketPrice();
+      await g.buyTicket({value: ticketPrice.toString()});
+      await advanceTime();
+      await g.unwrap(0);
+    });
   });
 });

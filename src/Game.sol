@@ -34,6 +34,10 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         mapping(address => bool) contains;
         uint8 numPlayers;
     }
+    struct Entropies {
+        uint256[8] vals;
+        uint8 numEntropies;
+    }
 
     /// @dev Chainlink related
     address private chainlinkVrfCoordinator = 0xdD3782915140c8f3b190B5D67eAc6dc5760C46E9;
@@ -56,7 +60,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// then that means that player players.addresses[3] is the one to go first
     uint8[256] public playersOrder;
     /// Chainlink entropies
-    uint256[8] public entropies;
+    Entropies public entropies;
     /// this array tracks the addresses of all the players that will participate in the game
     /// these guys bought the ticket before `gameStart`
     Players public players;
@@ -210,10 +214,11 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// After slicing the Chainlink entropy off-chain, give back the randomness
     /// result here. The technique which will be used must be voiced prior to the
     /// game, obviously
-    function initEnd(uint8[256] calldata _playersOrder) external onlyOwner {
+    function initEnd(uint8[256] calldata _playersOrder, uint32 _lastAction) external onlyOwner {
         require(now > timeBeforeGameStart + 1800, "game has not started yet");
         require(_playersOrder.length == players.numPlayers, "incorrect len");
         playersOrder = _playersOrder;
+        lastAction = _lastAction;
         initComplete = true;
     }
 
@@ -225,7 +230,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
 
     /// Gets called by Chainlink
     function fulfillRandomness(bytes32, uint256 randomness) internal override {
-        entropies[entropies.length] = randomness;
+        entropies.vals[entropies.numEntropies] = randomness;
+        entropies.numEntropies++;
     }
 
     /// @dev utility read funcs
@@ -238,5 +244,9 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     // todo: withdrawal functions
     function player(uint8 i) external view returns (address, uint8) {
         return (players.addresses[i], players.numPlayers);
+    }
+
+    function entropy(uint8 i) external view returns (uint256, uint8) {
+        return (entropies.vals[i], entropies.numEntropies);
     }
 }
