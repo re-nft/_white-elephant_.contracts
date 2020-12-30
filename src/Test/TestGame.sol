@@ -111,7 +111,7 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
         swaps[sender] = from;
         spaws[from] = sender;
-        currPlayer += 1;
+        currPlayer += missed + 1;
         lastAction = uint32(now);
     }
 
