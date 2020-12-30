@@ -121,6 +121,24 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         _;
     }
 
+    modifier youShallNotPatheth(uint8 missed) {
+        uint256 currTime = now;
+        require(currTime > lastAction, "timestamps are incorrect");
+        uint256 elapsed = currTime - lastAction;
+        uint256 playersSkipped = elapsed / thinkTime;
+        // someone has skipped their turn. We track this on the front-end
+        if (missed != 0) {
+            require(playersSkipped > 0, "zero players skipped");
+            require(playersSkipped < 255, "too many players skipped");
+            require(playersSkipped == missed, "playersSkipped not eq missed");
+            require(currPlayer < 256, "currPlayer exceeds 255");
+        } else {
+            require(playersSkipped == 0, "playersSkipped not zero");
+        }
+        require(players.addresses[playersOrder[currPlayer + missed]] == msg.sender, "not your turn");
+        _;
+    }
+
     /// Add who is allowed to deposit NFTs with this function
     /// All addresses that are not whitelisted will not be
     /// allowed to deposit.
@@ -156,37 +174,33 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     }
 
     /// @param missed - how many players missed their turn since lastAction
-    function unwrap(uint8 missed) external afterGameStart nonReentrant {
-        uint256 currTime = now;
-        require(currTime > lastAction, "timestamps are incorrect");
-        uint256 elapsed = currTime - lastAction;
-        uint256 playersSkipped = elapsed / thinkTime;
-        // someone has skipped their turn. We track this on the front-end
-        if (missed != 0) {
-            require(playersSkipped > 0, "zero players skipped");
-            require(playersSkipped < 255, "too many players skipped");
-            require(playersSkipped == missed, "playersSkipped not eq missed");
-            require(currPlayer < 256, "currPlayer exceeds 255");
-        } else {
-            require(playersSkipped == 0, "playersSkipped not zero");
-        }
-        require(players.addresses[playersOrder[currPlayer + missed]] == msg.sender, "not your turn");
+    function unwrap(uint8 missed) external afterGameStart nonReentrant youShallNotPatheth(missed) {
         currPlayer += missed + 1;
-        lastAction = uint32(currTime);
+        lastAction = uint32(now);
     }
 
     /// @param sender - index from players arr that you are stealing from
     /// @param from - index from players who to steal from
-    function steal(uint8 sender, uint8 from) external afterGameStart nonReentrant {
-        require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
+    /// @param missed - how many players missed their turn since lastAction
+    function steal(
+        uint8 sender,
+        uint8 from,
+        uint8 missed
+    ) external afterGameStart nonReentrant youShallNotPatheth(missed) {
         require(players.addresses[sender] == msg.sender, "sender is not valid");
+        require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
         require(spaws[from] == 0, "cant steal from them again");
-        require(swaps[sender] == 0, "you cant steal again. Check out Verkhovna Rada.");
+        require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
         swaps[sender] = from;
         spaws[from] = sender;
         currPlayer += 1;
         lastAction = uint32(now);
     }
+
+    // function finito() external onlyOwner {
+    // take into account the steals, the skips and unwraps
+    // distribute the NFT prizes to their rightful owners
+    // }
 
     /// Will revert the safeTransfer
     /// on transfer nothing happens, the NFT is not added to the prize pool

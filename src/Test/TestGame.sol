@@ -49,6 +49,24 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         }
     }
 
+    modifier youShallNotPatheth(uint8 missed) {
+        uint256 currTime = now;
+        require(currTime > lastAction, "timestamps are incorrect");
+        uint256 elapsed = currTime - lastAction;
+        uint256 playersSkipped = elapsed / thinkTime;
+        // someone has skipped their turn. We track this on the front-end
+        if (missed != 0) {
+            require(playersSkipped > 0, "zero players skipped");
+            require(playersSkipped < 255, "too many players skipped");
+            require(playersSkipped == missed, "playersSkipped not eq missed");
+            require(currPlayer < 256, "currPlayer exceeds 255");
+        } else {
+            require(playersSkipped == 0, "playersSkipped not zero");
+        }
+        require(players.addresses[playersOrder[currPlayer + missed]] == msg.sender, "not your turn");
+        _;
+    }
+
     constructor() public {
         depositors[0x465DCa9995D6c2a81A9Be80fBCeD5a770dEE3daE] = true;
         depositors[0x426923E98e347158D5C471a9391edaEa95516473] = true;
@@ -76,32 +94,20 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         players.numPlayers++;
     }
 
-    function unwrap(uint8 missed) external nonReentrant {
-        uint256 currTime = now;
-        require(currTime > lastAction, "timestamps are incorrect");
-        // console.log("currTime %s, lastAction %s", currTime, lastAction);
-        uint256 elapsed = currTime - lastAction;
-        // console.log("elapsed %s", elapsed);
-        uint256 playersSkipped = elapsed / thinkTime;
-        // console.log("playersSkipped %s", playersSkipped);
-        if (missed != 0) {
-            require(playersSkipped > 0, "zero players skipped");
-            require(playersSkipped < 255, "too many players skipped");
-            require(playersSkipped == missed, "playersSkipped not eq missed");
-            require(currPlayer < 256, "currPlayer exceeds 255");
-        } else {
-            require(playersSkipped == 0, "playersSkipped not zero");
-        }
-        require(players.addresses[playersOrder[currPlayer + missed]] == msg.sender, "not your turn");
+    function unwrap(uint8 missed) external nonReentrant youShallNotPatheth(missed) {
         currPlayer += missed + 1;
-        lastAction = uint32(currTime);
+        lastAction = uint32(now);
     }
 
-    function steal(uint8 sender, uint8 from) external nonReentrant {
-        require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
+    function steal(
+        uint8 sender,
+        uint8 from,
+        uint8 missed
+    ) external nonReentrant youShallNotPatheth(missed) {
         require(players.addresses[sender] == msg.sender, "sender is not valid");
+        require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
         require(spaws[from] == 0, "cant steal from them again");
-        require(swaps[sender] == 0, "you cant steal again. Check out Verkhovna Rada.");
+        require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
         swaps[sender] = from;
         spaws[from] = sender;
         currPlayer += 1;

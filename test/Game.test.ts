@@ -213,4 +213,24 @@ describe('Game', function () {
       await expect(g.unwrap(1)).to.be.revertedWith('not your turn');
     });
   });
+
+  context('Game Start - Steal', async function () {
+    it('steals once just fine', async function () {
+      const {TestGame: g, others} = await setup();
+      const lastBlock = await ethers.provider.getBlock('latest');
+      const timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      const ticketPrice = await g.ticketPrice();
+      const c = await ethers.getContract('TestGame', others[1].address);
+      await g.buyTicket({value: ticketPrice.toString()});
+      await c.buyTicket({value: ticketPrice.toString()});
+      await advanceTime(10800);
+      const playersOrder = Array(255).fill(0);
+      playersOrder[0] = 2;
+      playersOrder[1] = 1;
+    });
+    // it('wants to steal like in Verkhovna Rada, wont work here LMAO', async function () {
+    //   // no coordination issues here. science, b***h.
+    // });
+  });
 });
