@@ -107,6 +107,7 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
         require(spaws[from] == 0, "cant steal from them again");
+        // theoretically impossible, but being extra cautious doesnt hurt
         require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
         swaps[sender] = from;
         spaws[from] = sender;

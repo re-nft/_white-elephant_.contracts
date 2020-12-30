@@ -217,20 +217,54 @@ describe('Game', function () {
   context('Game Start - Steal', async function () {
     it('steals once just fine', async function () {
       const {TestGame: g, others} = await setup();
-      const lastBlock = await ethers.provider.getBlock('latest');
+      let lastBlock = await ethers.provider.getBlock('latest');
       const timestamp = lastBlock.timestamp;
       await g.testSetLastAction(timestamp);
       const ticketPrice = await g.ticketPrice();
       const c = await ethers.getContract('TestGame', others[1].address);
       await g.buyTicket({value: ticketPrice.toString()});
       await c.buyTicket({value: ticketPrice.toString()});
-      await advanceTime(10800);
       const playersOrder = Array(255).fill(0);
       playersOrder[0] = 2;
       playersOrder[1] = 1;
+      await g.testSetPlayersOrder(playersOrder);
+      await c.unwrap(0);
+      await g.steal(1, 2, 0);
+      // currPlayer is zero indexed
+      expect(await g.currPlayer()).to.be.equal(2);
+      lastBlock = await ethers.provider.getBlock('latest');
+      expect(await g.lastAction()).to.be.equal(lastBlock.timestamp);
+      expect(await g.swaps(1)).to.be.equal(2);
+      expect(await g.spaws(2)).to.be.equal(1);
     });
-    // it('wants to steal like in Verkhovna Rada, wont work here LMAO', async function () {
-    //   // no coordination issues here. science, b***h.
-    // });
+
+    it('wants to steal from the same acc', async function () {
+      const {TestGame: g, others} = await setup();
+      let lastBlock = await ethers.provider.getBlock('latest');
+      const timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      const ticketPrice = await g.ticketPrice();
+      const c = await ethers.getContract('TestGame', others[1].address);
+      const d = await ethers.getContract('TestGame', others[2].address);
+      await g.buyTicket({value: ticketPrice.toString()});
+      await c.buyTicket({value: ticketPrice.toString()});
+      await d.buyTicket({value: ticketPrice.toString()});
+      const playersOrder = Array(255).fill(0);
+      playersOrder[0] = 2;
+      playersOrder[1] = 1;
+      playersOrder[2] = 3;
+      await g.testSetPlayersOrder(playersOrder);
+      await c.unwrap(0);
+      await g.steal(1, 2, 0);
+      // currPlayer is zero indexed
+      expect(await g.currPlayer()).to.be.equal(2);
+      lastBlock = await ethers.provider.getBlock('latest');
+      expect(await g.lastAction()).to.be.equal(lastBlock.timestamp);
+      expect(await g.swaps(1)).to.be.equal(2);
+      expect(await g.spaws(2)).to.be.equal(1);
+      await expect(d.steal(3, 2, 0)).to.be.revertedWith(
+        'cant steal from them again'
+      );
+    });
   });
 });
