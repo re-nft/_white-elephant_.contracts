@@ -60,7 +60,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// then that means that player players.addresses[3] is the one to go first
     uint8[255] public playersOrder;
     /// Chainlink entropies
-    Entropies public entropies;
+    Entropies private entropies;
     /// this array tracks the addresses of all the players that will participate in the game
     /// these guys bought the ticket before `gameStart`
     Players public players;
@@ -164,15 +164,14 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         // someone has skipped their turn. We track this on the front-end
         if (missed != 0) {
             require(playersSkipped > 0, "zero players skipped");
-            require(playersSkipped < 256, "too many players skipped");
+            require(playersSkipped < 255, "too many players skipped");
             require(playersSkipped == missed, "playersSkipped not eq missed");
-            currPlayer += missed;
             require(currPlayer < 256, "currPlayer exceeds 255");
         } else {
             require(playersSkipped == 0, "playersSkipped not zero");
         }
-        require(players.addresses[playersOrder[currPlayer]] == msg.sender, "not your turn");
-        currPlayer += 1;
+        require(players.addresses[playersOrder[currPlayer + missed]] == msg.sender, "not your turn");
+        currPlayer += missed + 1;
         lastAction = uint32(currTime);
     }
 
@@ -247,7 +246,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         return (players.addresses[i], players.numPlayers);
     }
 
-    function entropy(uint8 i) external view returns (uint256, uint8) {
+    function entropy(uint8 i) external view onlyOwner returns (uint256, uint8) {
         return (entropies.vals[i], entropies.numEntropies);
     }
 }

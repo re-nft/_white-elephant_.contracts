@@ -11,8 +11,8 @@ const advanceToGameStart = async (timestamp: number) => {
   await ethers.provider.send('evm_mine', []);
 };
 
-const advanceTime = async () => {
-  await ethers.provider.send('evm_increaseTime', [1]);
+const advanceTime = async (seconds: number) => {
+  await ethers.provider.send('evm_increaseTime', [seconds]);
   await ethers.provider.send('evm_mine', []);
 };
 
@@ -109,16 +109,15 @@ describe('Game', function () {
     });
   });
 
-  context('Game Start', async function () {
-    it('unwraps', async function () {
+  context('Game Start - Unwrap', async function () {
+    it('is bueno', async function () {
       const {TestGame: g} = await setup();
-      await advanceToGameStart;
       let lastBlock = await ethers.provider.getBlock('latest');
       let timestamp = lastBlock.timestamp;
       await g.testSetLastAction(timestamp);
       const ticketPrice = await g.ticketPrice();
       await g.buyTicket({value: ticketPrice.toString()});
-      await advanceTime();
+      await advanceTime(1);
       // for testing purposes setting the playersOrder here without entropy
       // in prod, we will construct playersOrder from chainlink's entropies
       // playersOrder is 1-indexed, thus 255 players in total
@@ -135,33 +134,83 @@ describe('Game', function () {
 
     it('forbids to unwrap if not your turn', async function () {
       const {TestGame: g} = await setup();
-      await advanceToGameStart;
       const lastBlock = await ethers.provider.getBlock('latest');
       const timestamp = lastBlock.timestamp;
       await g.testSetLastAction(timestamp);
       const ticketPrice = await g.ticketPrice();
       await g.buyTicket({value: ticketPrice.toString()});
-      await advanceTime();
+      await advanceTime(1);
       const playersOrder = Array(255).fill(0);
       playersOrder[0] = 2;
       await g.testSetPlayersOrder(playersOrder);
       await expect(g.unwrap('0')).to.be.revertedWith('not your turn');
     });
 
-    it('correctly handles missed in unwrap', async function () {
-      const {TestGame: g} = await setup();
-      await advanceToGameStart;
+    it('correctly handles 1 missed', async function () {
+      const {TestGame: g, others} = await setup();
+      let lastBlock = await ethers.provider.getBlock('latest');
+      const timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      const ticketPrice = await g.ticketPrice();
+      const contract = await ethers.getContract('TestGame', others[1].address);
+      await g.buyTicket({value: ticketPrice.toString()});
+      await contract.buyTicket({value: ticketPrice.toString()});
+      await advanceTime(10800);
+      const playersOrder = Array(255).fill(0);
+      playersOrder[0] = 1;
+      playersOrder[1] = 2;
+      await g.testSetPlayersOrder(playersOrder);
+      await expect(g.unwrap(0)).to.be.revertedWith('playersSkipped not zero');
+      await contract.unwrap(1);
+      // next player index
+      expect(await contract.currPlayer()).to.be.equal(2);
+      lastBlock = await ethers.provider.getBlock('latest');
+      expect(await contract.lastAction()).to.be.equal(lastBlock.timestamp);
+    });
+
+    it('correctly handles 2 missed', async function () {
+      const {TestGame: g, others} = await setup();
+      let lastBlock = await ethers.provider.getBlock('latest');
+      const timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      const ticketPrice = await g.ticketPrice();
+      const c1 = await ethers.getContract('TestGame', others[1].address);
+      const c2 = await ethers.getContract('TestGame', others[2].address);
+      await g.buyTicket({value: ticketPrice.toString()});
+      await c1.buyTicket({value: ticketPrice.toString()});
+      await c2.buyTicket({value: ticketPrice.toString()});
+      await advanceTime(2 * 10800);
+      const playersOrder = Array(255).fill(0);
+      playersOrder[0] = 3;
+      playersOrder[1] = 1;
+      playersOrder[2] = 2;
+      await g.testSetPlayersOrder(playersOrder);
+      await expect(c2.unwrap(0)).to.be.revertedWith('playersSkipped not zero');
+      await expect(c2.unwrap(2)).to.be.revertedWith('not your turn');
+      await expect(g.unwrap(0)).to.be.revertedWith('playersSkipped not zero');
+      await expect(g.unwrap(2)).to.be.revertedWith('not your turn');
+      await expect(c1.unwrap(0)).to.be.revertedWith('playersSkipped not zero');
+      await c1.unwrap(2);
+      expect(await c1.currPlayer()).to.be.equal(3);
+      lastBlock = await ethers.provider.getBlock('latest');
+      expect(await c1.lastAction()).to.be.equal(lastBlock.timestamp);
+    });
+
+    it('disallows the person that missed the turn to unwrap', async function () {
+      const {TestGame: g, others} = await setup();
       const lastBlock = await ethers.provider.getBlock('latest');
       const timestamp = lastBlock.timestamp;
       await g.testSetLastAction(timestamp);
       const ticketPrice = await g.ticketPrice();
-      // buy from a different account
-      // await g.buyTicket({value: ticketPrice.toString()});
-      // await advanceTime();
-      // const playersOrder = Array(255).fill(0);
-      // playersOrder[0] = 2;
-      // await g.testSetPlayersOrder(playersOrder);
-      // await expect(g.unwrap('0')).to.be.revertedWith('not your turn');
+      const contract = await ethers.getContract('TestGame', others[1].address);
+      await g.buyTicket({value: ticketPrice.toString()});
+      await contract.buyTicket({value: ticketPrice.toString()});
+      await advanceTime(10800);
+      const playersOrder = Array(255).fill(0);
+      playersOrder[0] = 1;
+      playersOrder[1] = 2;
+      await g.testSetPlayersOrder(playersOrder);
+      await expect(g.unwrap(1)).to.be.revertedWith('not your turn');
     });
   });
 });

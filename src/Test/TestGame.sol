@@ -79,19 +79,21 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
     function unwrap(uint8 missed) external nonReentrant {
         uint256 currTime = now;
         require(currTime > lastAction, "timestamps are incorrect");
+        // console.log("currTime %s, lastAction %s", currTime, lastAction);
         uint256 elapsed = currTime - lastAction;
+        // console.log("elapsed %s", elapsed);
         uint256 playersSkipped = elapsed / thinkTime;
+        // console.log("playersSkipped %s", playersSkipped);
         if (missed != 0) {
             require(playersSkipped > 0, "zero players skipped");
-            require(playersSkipped < 256, "too many players skipped");
+            require(playersSkipped < 255, "too many players skipped");
             require(playersSkipped == missed, "playersSkipped not eq missed");
-            currPlayer += missed;
             require(currPlayer < 256, "currPlayer exceeds 255");
         } else {
             require(playersSkipped == 0, "playersSkipped not zero");
         }
-        require(players.addresses[playersOrder[currPlayer]] == msg.sender, "not your turn");
-        currPlayer += 1;
+        require(players.addresses[playersOrder[currPlayer + missed]] == msg.sender, "not your turn");
+        currPlayer += missed + 1;
         lastAction = uint32(currTime);
     }
 
