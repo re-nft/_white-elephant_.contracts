@@ -5,6 +5,7 @@ import {
   getUnnamedAccounts,
   getNamedAccounts,
 } from 'hardhat';
+import {PassThrough} from 'stream';
 
 const advanceToGameStart = async (timestamp: number) => {
   await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp]);
@@ -19,14 +20,20 @@ const advanceTime = async (seconds: number) => {
 const setup = deployments.createFixture(async () => {
   await deployments.fixture('Game');
   await deployments.fixture('TestGame');
+  await deployments.fixture('TestERC20');
+  await deployments.fixture('TestERC721');
   const {deployer} = await getNamedAccounts();
   const others = await getUnnamedAccounts();
   const game = await ethers.getContract('Game');
   const testGame = await ethers.getContract('TestGame');
+  const testErc20 = await ethers.getContract('TestERC20');
+  const testErc721 = await ethers.getContract('TestERC721');
   return {
     deployer,
     Game: game,
     TestGame: testGame,
+    TestERC20: testErc20,
+    TestERC721: testErc721,
     others: others.map((acc: string) => ({address: acc})),
   };
 });
@@ -41,9 +48,6 @@ describe('Game', function () {
       expect(
         await g.depositors('0x426923E98e347158D5C471a9391edaEa95516473')
       ).to.equal(true);
-      // expect(
-      //   await g.depositors('0x63A556c75443b176b5A4078e929e38bEb37a1ff2')
-      // ).to.equal(true);
     });
 
     it('disallows non-whitelisted depositors', async function () {
@@ -265,6 +269,39 @@ describe('Game', function () {
       await expect(d.steal(3, 2, 0)).to.be.revertedWith(
         'cant steal from them again'
       );
+    });
+  });
+
+  context('Finish', async function () {
+    it('withdraws all', async function () {
+      const {
+        TestGame: g,
+        TestERC20: e20,
+        TestERC721: e721,
+        deployer,
+      } = await setup();
+      // erc20
+      let balance = await e20.balanceOf(g.address);
+      expect(balance.toString()).to.be.equal(ethers.utils.parseEther('1000'));
+      balance = await e20.balanceOf(deployer);
+      expect(balance.toString()).to.be.equal('0');
+      await g.withdrawERC20(e20.address);
+      balance = await e20.balanceOf(g.address);
+      expect(balance.toString()).to.be.equal('0');
+      balance = await e20.balanceOf(deployer);
+      expect(balance.toString()).to.be.equal(ethers.utils.parseEther('1000'));
+      // erc721
+      await e721.awardItem(g.address);
+      let owner = await e721.ownerOf(1);
+      expect(owner).to.be.equal(g.address);
+      await g.withdrawERC721(e721.address, 1);
+      owner = await e721.ownerOf(1);
+      expect(owner).to.be.equal(deployer);
+      // ether
+    });
+
+    it('distributes NFTs to players', async function () {
+      console.log();
     });
   });
 });

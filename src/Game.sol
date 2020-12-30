@@ -213,7 +213,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         revert("we are saving you your NFT, you are welcome");
     }
 
-    /// we slice up Chainlink's uint256 into 32 chunks to obtaink 32 uint8 vals
+    /// we slice up Chainlink's uint256 into 32 chunks to obtain 32 uint8 vals
     /// each one now represents the order of the ticket buyers, which also
     /// represents the NFT that they will unwrap (unless swapped with)
     function initStart(uint8 numCalls, uint256[] calldata ourEntropy) external onlyOwner {
@@ -248,19 +248,30 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         entropies.numEntropies++;
     }
 
-    /// @dev utility read funcs
-
-    /// @dev admin funcs
     function setTicketPrice(uint256 v) external onlyOwner {
         ticketPrice = v;
     }
 
-    // todo: withdrawal functions
     function player(uint8 i) external view returns (address, uint8) {
         return (players.addresses[i], players.numPlayers);
     }
 
+    /// to avoid having the players rig the game by having this information
+    /// to buy multiple tickts from different accounts and computing what
+    /// NFT they will get themselves
     function entropy(uint8 i) external view onlyOwner returns (uint256, uint8) {
         return (entropies.vals[i], entropies.numEntropies);
+    }
+
+    function withdrawERC721(ERC721 nft, uint256 tokenId) external onlyOwner {
+        nft.transferFrom(address(this), msg.sender, tokenId);
+    }
+
+    function withdrawERC20(ERC20 token) external onlyOwner {
+        token.transfer(msg.sender, token.balanceOf(address(this)));
+    }
+
+    function withdrawEth() external onlyOwner {
+        msg.sender.transfer(address(this).balance);
     }
 }

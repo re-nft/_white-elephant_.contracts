@@ -139,4 +139,16 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
     function testSetPlayersOrder(uint8[255] calldata _playersOrder) external onlyOwner {
         playersOrder = _playersOrder;
     }
+
+    function withdrawERC721(ERC721 nft, uint256 tokenId) external onlyOwner {
+        nft.transferFrom(address(this), msg.sender, tokenId);
+    }
+
+    function withdrawERC20(ERC20 token) external onlyOwner {
+        token.transfer(msg.sender, token.balanceOf(address(this)));
+    }
+
+    function withdrawEth() external onlyOwner {
+        msg.sender.transfer(address(this).balance);
+    }
 }
