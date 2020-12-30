@@ -29,6 +29,11 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         address adr;
         uint256 id;
     }
+    struct Players {
+        address[256] addresses;
+        mapping(address => bool) contains;
+        uint8 numPlayers;
+    }
 
     /// @dev Chainlink related
     address private chainlinkVrfCoordinator = 0xdD3782915140c8f3b190B5D67eAc6dc5760C46E9;
@@ -48,13 +53,14 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// This is done such that the maps of steals "swaps" and "spaws" would not signify a player at index
     /// 0 (default value of uninitialised uint8).
     /// Interpretation of this is that if at index 0 in playersOrder we have index 3
-    /// then that means that player players[3] is the one to go first
+    /// then that means that player players.addresses[3] is the one to go first
     uint8[256] public playersOrder;
     /// Chainlink entropies
     uint256[8] public entropies;
     /// this array tracks the addresses of all the players that will participate in the game
     /// these guys bought the ticket before `gameStart`
-    address[256] public players;
+    Players public players;
+
     /// to keep track of all the deposited NFTs
     Nft[256] public nfts;
     /// address on the left stole from address on the right
@@ -135,10 +141,13 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         }
     }
 
-    function buyTicket() public payable beforeGameStart {
+    function buyTicket() public payable beforeGameStart nonReentrant {
         require(msg.value >= ticketPrice, "sent ether too low");
-        /// @dev pay ticket price and call this function to appear in the arr
-        players[players.length] = msg.sender;
+        require(players.numPlayers < 256, "total number of players reached");
+        require(players.contains[msg.sender] == false, "cant buy more");
+        players.contains[msg.sender] = true;
+        players.addresses[players.numPlayers] = msg.sender;
+        players.numPlayers++;
     }
 
     /// @param missed - how many players missed their turn since lastAction
@@ -157,7 +166,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         } else {
             require(playersSkipped == 0, "playersSkipped not zero");
         }
-        require(players[playersOrder[currPlayer]] == msg.sender, "not your turn");
+        require(players.addresses[playersOrder[currPlayer]] == msg.sender, "not your turn");
         currPlayer += 1;
         lastAction = uint32(currTime);
     }
@@ -165,8 +174,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// @param sender - index from players arr that you are stealing from
     /// @param from - index from players who to steal from
     function steal(uint8 sender, uint8 from) external afterGameStart nonReentrant {
-        require(players[playersOrder[currPlayer]] == players[sender], "not your order");
-        require(players[sender] == msg.sender, "sender is not valid");
+        require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
+        require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(spaws[from] == 0, "cant steal from them again");
         require(swaps[sender] == 0, "you cant steal again. Check out Verkhovna Rada.");
         swaps[sender] = from;
@@ -203,7 +212,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// game, obviously
     function initEnd(uint8[256] calldata _playersOrder) external onlyOwner {
         require(now > timeBeforeGameStart + 1800, "game has not started yet");
-        require(_playersOrder.length == players.length, "incorrect len");
+        require(_playersOrder.length == players.numPlayers, "incorrect len");
         playersOrder = _playersOrder;
         initComplete = true;
     }
@@ -227,4 +236,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     }
 
     // todo: withdrawal functions
+    function player(uint8 i) external view returns (address, uint8) {
+        return (players.addresses[i], players.numPlayers);
+    }
 }
