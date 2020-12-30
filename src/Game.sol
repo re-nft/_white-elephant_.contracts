@@ -58,7 +58,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// 0 (default value of uninitialised uint8).
     /// Interpretation of this is that if at index 0 in playersOrder we have index 3
     /// then that means that player players.addresses[3] is the one to go first
-    uint8[256] public playersOrder;
+    uint8[255] public playersOrder;
     /// Chainlink entropies
     Entropies public entropies;
     /// this array tracks the addresses of all the players that will participate in the game
@@ -66,7 +66,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     Players public players;
 
     /// to keep track of all the deposited NFTs
-    Nft[256] public nfts;
+    Nft[255] public nfts;
     /// address on the left stole from address on the right
     /// think of it as a swap of NFTs
     /// once again the address is the index in players array
@@ -150,7 +150,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         require(players.numPlayers < 256, "total number of players reached");
         require(players.contains[msg.sender] == false, "cant buy more");
         players.contains[msg.sender] = true;
-        players.addresses[players.numPlayers] = msg.sender;
+        // at 0-index we have address(0)
+        players.addresses[players.numPlayers + 1] = msg.sender;
         players.numPlayers++;
     }
 
@@ -214,7 +215,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// After slicing the Chainlink entropy off-chain, give back the randomness
     /// result here. The technique which will be used must be voiced prior to the
     /// game, obviously
-    function initEnd(uint8[256] calldata _playersOrder, uint32 _lastAction) external onlyOwner {
+    function initEnd(uint8[255] calldata _playersOrder, uint32 _lastAction) external onlyOwner {
         require(now > timeBeforeGameStart + 1800, "game has not started yet");
         require(_playersOrder.length == players.numPlayers, "incorrect len");
         playersOrder = _playersOrder;

@@ -12,7 +12,7 @@ const advanceToGameStart = async (timestamp: number) => {
 };
 
 const advanceTime = async () => {
-  await ethers.provider.send('evm_increaseTime', []);
+  await ethers.provider.send('evm_increaseTime', [1]);
   await ethers.provider.send('evm_mine', []);
 };
 
@@ -73,7 +73,7 @@ describe('Game', function () {
       await expect(g.initStart(0, [])).to.be.revertedWith(
         'game has not started yet'
       );
-      await expect(g.initEnd(Array(256).fill(0))).to.be.revertedWith(
+      await expect(g.initEnd(Array(255).fill(0), 0)).to.be.revertedWith(
         'game has not started yet'
       );
     });
@@ -94,7 +94,7 @@ describe('Game', function () {
       const {TestGame: g, deployer} = await setup();
       const ticketPrice = await g.ticketPrice();
       await g.buyTicket({value: ticketPrice.toString()});
-      const [firstPlayer, num] = await g.player(0);
+      const [firstPlayer, num] = await g.player(1);
       expect(firstPlayer).to.equal(deployer);
       expect(num).to.equal(1);
     });
@@ -113,13 +113,55 @@ describe('Game', function () {
     it('unwraps', async function () {
       const {TestGame: g} = await setup();
       await advanceToGameStart;
+      let lastBlock = await ethers.provider.getBlock('latest');
+      let timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      const ticketPrice = await g.ticketPrice();
+      await g.buyTicket({value: ticketPrice.toString()});
+      await advanceTime();
+      // for testing purposes setting the playersOrder here without entropy
+      // in prod, we will construct playersOrder from chainlink's entropies
+      // playersOrder is 1-indexed, thus 255 players in total
+      const playersOrder = Array(255).fill(0);
+      // players[playersOrder] is owner
+      playersOrder[0] = 1;
+      await g.testSetPlayersOrder(playersOrder);
+      await g.unwrap('0');
+      expect(await g.currPlayer()).to.equal(1);
+      lastBlock = await ethers.provider.getBlock('latest');
+      timestamp = lastBlock.timestamp;
+      expect(await g.lastAction()).to.equal(timestamp);
+    });
+
+    it('forbids to unwrap if not your turn', async function () {
+      const {TestGame: g} = await setup();
+      await advanceToGameStart;
       const lastBlock = await ethers.provider.getBlock('latest');
       const timestamp = lastBlock.timestamp;
       await g.testSetLastAction(timestamp);
       const ticketPrice = await g.ticketPrice();
       await g.buyTicket({value: ticketPrice.toString()});
       await advanceTime();
-      await g.unwrap(0);
+      const playersOrder = Array(255).fill(0);
+      playersOrder[0] = 2;
+      await g.testSetPlayersOrder(playersOrder);
+      await expect(g.unwrap('0')).to.be.revertedWith('not your turn');
+    });
+
+    it('correctly handles missed in unwrap', async function () {
+      const {TestGame: g} = await setup();
+      await advanceToGameStart;
+      const lastBlock = await ethers.provider.getBlock('latest');
+      const timestamp = lastBlock.timestamp;
+      await g.testSetLastAction(timestamp);
+      const ticketPrice = await g.ticketPrice();
+      // buy from a different account
+      // await g.buyTicket({value: ticketPrice.toString()});
+      // await advanceTime();
+      // const playersOrder = Array(255).fill(0);
+      // playersOrder[0] = 2;
+      // await g.testSetPlayersOrder(playersOrder);
+      // await expect(g.unwrap('0')).to.be.revertedWith('not your turn');
     });
   });
 });

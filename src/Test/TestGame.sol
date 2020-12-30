@@ -15,7 +15,7 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         uint256 id;
     }
     struct Players {
-        address payable[256] addresses;
+        address[256] addresses;
         mapping(address => bool) contains;
         uint8 numPlayers;
     }
@@ -26,28 +26,17 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
     uint256 private chainlinkCallFee = 0.1 * 10**18;
     uint256 public ticketPrice = 0.0001 ether;
     uint32 public timeBeforeGameStart = 1609718399;
-    uint8[256] public playersOrder;
+    uint8[255] public playersOrder;
     uint256[8] public entropies;
     Players public players;
-    Nft[256] public nfts;
+    Nft[255] public nfts;
     mapping(uint8 => uint8) public swaps;
     mapping(uint8 => uint8) public spaws;
     mapping(address => bool) public depositors;
     bool private initComplete = true;
-    uint32 private lastAction;
+    uint32 public lastAction;
     uint16 public thinkTime = 10800;
     uint8 public currPlayer = 0;
-
-    modifier beforeGameStart() {
-        require(now < timeBeforeGameStart, "game has now begun");
-        _;
-    }
-
-    modifier afterGameStart() {
-        require(now > timeBeforeGameStart + 1800, "game has not started yet");
-        require(initComplete, "game has not initialized yet");
-        _;
-    }
 
     modifier onlyWhitelisted() {
         require(depositors[msg.sender], "you are not allowed to deposit");
@@ -78,16 +67,16 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         }
     }
 
-    function buyTicket() public payable beforeGameStart nonReentrant {
+    function buyTicket() public payable nonReentrant {
         require(msg.value >= ticketPrice, "sent ether too low");
         require(players.numPlayers < 256, "total number of players reached");
         require(players.contains[msg.sender] == false, "cant buy more");
         players.contains[msg.sender] = true;
-        players.addresses[players.numPlayers] = msg.sender;
+        players.addresses[players.numPlayers + 1] = msg.sender;
         players.numPlayers++;
     }
 
-    function unwrap(uint8 missed) external afterGameStart nonReentrant {
+    function unwrap(uint8 missed) external nonReentrant {
         uint256 currTime = now;
         require(currTime > lastAction, "timestamps are incorrect");
         uint256 elapsed = currTime - lastAction;
@@ -106,7 +95,7 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         lastAction = uint32(currTime);
     }
 
-    function steal(uint8 sender, uint8 from) external afterGameStart nonReentrant {
+    function steal(uint8 sender, uint8 from) external nonReentrant {
         require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
         require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(spaws[from] == 0, "cant steal from them again");
@@ -138,7 +127,7 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         lastAction = _lastAction;
     }
 
-    function testSetPlayersOrder(uint8[256] calldata _playersOrder) external onlyOwner {
+    function testSetPlayersOrder(uint8[255] calldata _playersOrder) external onlyOwner {
         playersOrder = _playersOrder;
     }
 }
