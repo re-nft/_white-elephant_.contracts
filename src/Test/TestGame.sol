@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
 contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
+    event Received(address, uint256);
     struct Nft {
         address adr;
         uint256 id;
@@ -122,6 +123,10 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         bytes memory
     ) public override returns (bytes4) {
         revert("we are saving you your NFT, you are welcome");
+    }
+
+    receive() external payable {
+        emit Received(msg.sender, msg.value);
     }
 
     function setTicketPrice(uint256 v) external onlyOwner {

@@ -5,7 +5,6 @@ import {
   getUnnamedAccounts,
   getNamedAccounts,
 } from 'hardhat';
-import {PassThrough} from 'stream';
 
 const advanceToGameStart = async (timestamp: number) => {
   await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp]);
@@ -298,10 +297,24 @@ describe('Game', function () {
       owner = await e721.ownerOf(1);
       expect(owner).to.be.equal(deployer);
       // ether
+      await (await ethers.getSigner(deployer)).sendTransaction({
+        to: g.address,
+        value: ethers.utils.parseEther('1'),
+      });
+      balance = await ethers.provider.getBalance(g.address);
+      expect(balance).to.be.equal(ethers.utils.parseEther('1'));
+      const preBalance = await ethers.provider.getBalance(deployer);
+      const tx = await g.withdrawEth();
+      const receipt = await tx.wait();
+      const postBalance = await ethers.provider.getBalance(deployer);
+      expect(
+        postBalance
+          .sub(preBalance)
+          .add(receipt.gasUsed.mul(tx.gasPrice))
+          .toString()
+      ).to.be.equal(ethers.utils.parseEther('1'));
     });
 
-    it('distributes NFTs to players', async function () {
-      console.log();
-    });
+    // it('distributes NFTs to players', async function () {});
   });
 });

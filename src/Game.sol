@@ -25,6 +25,7 @@ import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
  * to steal and an NFT is randomly assigned to them.
  */
 contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
+    event Received(address, uint256);
     struct Nft {
         address adr;
         uint256 id;
@@ -240,6 +241,10 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     function getRandomness(uint256 ourEntropy) internal returns (bytes32 requestId) {
         require(LINK.balanceOf(address(this)) >= chainlinkCallFee, "not enough LINK");
         requestId = requestRandomness(chainlinkKeyHash, chainlinkCallFee, ourEntropy);
+    }
+
+    receive() external payable {
+        emit Received(msg.sender, msg.value);
     }
 
     /// Gets called by Chainlink
