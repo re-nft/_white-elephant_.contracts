@@ -64,11 +64,18 @@ describe('Game', function () {
     await expect(g.initStart(0, [])).to.be.revertedWith(
       'game has not started yet'
     );
-    // await expect(g.initEnd([])).to.be.revertedWith('game has not started yet');
+    await expect(g.initEnd(Array(256).fill(0))).to.be.revertedWith(
+      'game has not started yet'
+    );
   });
 
-  // it('successfully init starts the game', async function () {
-  //   const {Game: g} = await setup();
-  //   await g.initStart(1, [0]);
-  // });
+  it('successfully init starts the game', async function () {
+    const {Game: g} = await setup();
+    const timeBeforeGameStart = await g.timeBeforeGameStart();
+    await advanceToGameStart(timeBeforeGameStart + 2 * 900);
+    // chainlink call
+    await expect(g.initStart(1, [0])).to.be.revertedWith(
+      'function call to a non-contract account'
+    );
+  });
 });
