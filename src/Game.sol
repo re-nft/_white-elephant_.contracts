@@ -2,7 +2,7 @@
 
 /// @author Nazariy Vavryk [nazariy@inbox.ru] - reNFT Labs [https://twitter.com/renftlabs]
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.0;
+pragma solidity >=0.6.0 <0.7.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -189,7 +189,9 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// we slice up Chainlink's uint256 into 32 chunks to obtaink 32 uint8 vals
     /// each one now represents the order of the ticket buyers, which also
     /// represents the NFT that they will unwrap (unless swapped with)
-    function initStart(uint8 numCalls, uint256[] calldata ourEntropy) external onlyOwner afterGameStart {
+    function initStart(uint8 numCalls, uint256[] calldata ourEntropy) external onlyOwner {
+        require(initComplete == false, "cannot init start again");
+        require(now > timeBeforeGameStart + 1800, "game has not started yet");
         require(numCalls == ourEntropy.length, "incorrect entropy size");
         for (uint256 i = 0; i < numCalls; i++) {
             getRandomness(ourEntropy[i]);
@@ -199,7 +201,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     /// After slicing the Chainlink entropy off-chain, give back the randomness
     /// result here. The technique which will be used must be voiced prior to the
     /// game, obviously
-    function initEnd(uint8[256] calldata _playersOrder) external onlyOwner afterGameStart {
+    function initEnd(uint8[256] calldata _playersOrder) external onlyOwner {
+        require(now > timeBeforeGameStart + 1800, "game has not started yet");
         require(_playersOrder.length == players.length, "incorrect len");
         playersOrder = _playersOrder;
         initComplete = true;

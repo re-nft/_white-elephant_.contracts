@@ -45,9 +45,30 @@ describe('Game', function () {
     ).to.be.revertedWith('you are not allowed to deposit');
   });
 
-  // it('adds new whitelisted depositors', async function () {
-  //   const {Game: g, deployer: owner} = await setup();
-  //   await g.addDepositors([owner]);
-  //   expect(await g.depositors(owner)).to.equal(true);
+  it('adds new whitelisted depositors', async function () {
+    const {Game: g, deployer: owner} = await setup();
+    await g.addDepositors([owner]);
+    expect(await g.depositors(owner)).to.equal(true);
+  });
+
+  it('is before game start initially', async function () {
+    const {Game: g} = await setup();
+    const timeBeforeGameStart = await g.timeBeforeGameStart();
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const now = latestBlock.timestamp;
+    expect(now).to.be.lessThan(timeBeforeGameStart);
+  });
+
+  it('disallows to call inits before game start', async function () {
+    const {Game: g} = await setup();
+    await expect(g.initStart(0, [])).to.be.revertedWith(
+      'game has not started yet'
+    );
+    // await expect(g.initEnd([])).to.be.revertedWith('game has not started yet');
+  });
+
+  // it('successfully init starts the game', async function () {
+  //   const {Game: g} = await setup();
+  //   await g.initStart(1, [0]);
   // });
 });
