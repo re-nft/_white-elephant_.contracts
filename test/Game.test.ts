@@ -431,7 +431,6 @@ describe('Game', function () {
       // second buyer steals from first buyer - second gift
       const karrekt = [2, 4, 0, 3, 1];
       for (let i = 0; i < 5; i++) {
-        console.log(receipt.events[i].args.prizeIx.toString());
         expect(receipt.events[i].args.prizeIx).to.be.equal(karrekt[i]);
       }
     });

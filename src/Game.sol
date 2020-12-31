@@ -235,9 +235,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
                 }
                 prizeIx = op[prizeIx - 1];
             }
-            // event PrizeTransfer(address to, address nftishka, uint256 id, uint256 prizeIx);
+            ERC721(nfts[prizeIx].adr).transferFrom(address(this), players.addresses[playerIx], nfts[prizeIx].id);
             emit PrizeTransfer(players.addresses[playerIx], nfts[prizeIx].adr, nfts[prizeIx].id, prizeIx);
-            // emit PrizeTransfer();
         }
     }
 
