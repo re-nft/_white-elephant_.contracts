@@ -43,10 +43,10 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
     }
 
     /// @dev Chainlink related
-    address private chainlinkVrfCoordinator = 0xdD3782915140c8f3b190B5D67eAc6dc5760C46E9;
-    address private chainlinkLinkToken = 0xa36085F69e2889c224210F603D836748e7dC0088;
-    bytes32 private chainlinkKeyHash = 0x6c3699283bda56ad74f6b855546325b68d482e983852a7a82979cc4807b641f4;
-    uint256 public ticketPrice = 0.0001 ether;
+    address private chainlinkVrfCoordinator = 0xf0d54349aDdcf704F77AE15b96510dEA15cb7952;
+    address private chainlinkLinkToken = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
+    bytes32 private chainlinkKeyHash = 0xAA77729D3466CA35AE8D28B3BBAC7CC36A5031EFDC430821C02BC31A238AF445;
+    uint256 public ticketPrice = 0.5 ether;
     /// @dev before this date, you can be buying tickets. After this date, unwrapping begins
     /// @dev 2021 January 3rd 23:59:59 GMT
     uint32 public timeBeforeGameStart = 1609718399;
@@ -276,7 +276,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
 
     /// Randomness is queried afterGameStart but before initComplete (flag)
     function getRandomness(uint256 ourEntropy) internal returns (bytes32 requestId) {
-        uint256 chainlinkCallFee = 0.1 * 10**18;
+        uint256 chainlinkCallFee = 2000000000000000000;
         require(LINK.balanceOf(address(this)) >= chainlinkCallFee, "not enough LINK");
         requestId = requestRandomness(chainlinkKeyHash, chainlinkCallFee, ourEntropy);
     }
