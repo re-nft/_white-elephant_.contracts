@@ -316,16 +316,7 @@ describe('Game', function () {
     });
 
     it('distributes NFTs to players chivalrously', async function () {
-      // 20 players. Simulating the worst case here in terms of time complexity
-      // such a case would occur if whoever stole from you, was stolen from as well
-      // and then that person was stolen from, and so on. And this is the case as
-      // much as possible. When would this happen?
-      // Let's note that the order in which players take turns is not important here
-      // This implies that the playersOrder is arbitrary and we can set it to be
-      // equal to the players. i.e. each person takes turn as per who bought
-      // ticket the earliest
       const {TestGame: g, others} = await setup();
-      // console.log('others', others);
       const ticketPrice = await g.ticketPrice();
       const cs = [];
       for (let i = 0; i < others.length; i++) {
@@ -339,63 +330,109 @@ describe('Game', function () {
       }
       let i = 0;
       const po = Array(255);
-      while (i < 255) po[i++] = i;
-      // 1, 2, 3, ..., 255
-      // only 20 players in this example
+      const op = Array(256);
+      while (i < 255) {
+        po[i++] = i;
+        op[i - 1] = i - 1;
+      }
+      op[255] = 255;
+      // po = [1,2,3,4,..,255,256]
+      // op = [0,1,.......,254,255]
+      const karrekt = [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        0,
+      ];
       await g.testSetPlayersOrder(po);
-      // first one unwraps. His prize is nft at index 0, for his order is 1
       await cs[0].unwrap(0);
-      // the other ones steal
-      // the first stealer steals from the above, so his prize is nft at index 0
-      // the prize of the first player is now at index 1
-      // the second stealer steals from the first one, so his prize is nft at index 0
-      // the prize of the first stealer is now at index 2
-      // here is the sequence: [1,2,3,...,19,0]
       for (let i = 1; i < cs.length; i++) {
-        // playersOrder = [1, 2, 3, ..., 20]
-        // steal(1, 0, 0) means that playersOrder[1]
-        // is stealing from playersOrder[0].
-        // i.e. players[2] is stealing
-        // from players[1]. recall, players[0] is empty, thus 255 players
-        // and so we expect swaps[i + 1] = i;
-        // also swaps[i + 1] = i iff spaws[i] = i + 1;
-        // in other words
-        // player at index i + 1 stole from player at index i
-        // iff
-        // player at index i was stolen by player at index i + 1
         await cs[i].steal(i, i - 1, 0);
         const swapsI = await cs[i].swaps(i + 1);
         expect(swapsI).to.be.equal(i);
         const spawsI = await cs[i].spaws(i);
         expect(spawsI).to.be.equal(i + 1);
       }
-
-      // op gives you index of a player (from players arr) in playersOrder
-      // e.g. imagine playersOrder is [1,4,2,3]
-      //                   players is [a,b,c,d]
-      // then orderPlayers (op) is    [0,2,3,1]
-      // following up on this example, you have address a, at index 0
-      // what index in playersOrder points to it? the one at index 0
-      // you have address b, at index 1, what index in po points to it?
-      // 2
-      // you have address c, at index 2, what index in po pints to it?
-      // 3
-      // In the case when playersOrder = [1,2,3,4,...,20]
-      // op is trivially [0,...,19]
-      const op = po.map((v) => v - 1);
       const tx = await g.finito(op, 1, cs.length + 1);
       const {events} = await tx.wait();
-      // ensure the prizes are correctly distributed
       for (let i = 0; i < events.length; i++) {
-        if (i === events.length - 1) {
-          expect(events[i].args.prizeIx).to.equal(0);
-          break;
-        }
-        // nft indices
-        // [1, 2, 3, ..., 19, 0]
-        const event = events[i];
-        const {prizeIx} = event.args;
-        expect(prizeIx).to.equal(i + 1);
+        expect(events[i].args.prizeIx).to.equal(karrekt[i]);
+      }
+    });
+
+    it('implies I am not paranoid', async function () {
+      const {TestGame: deployerContract, others} = await setup();
+      const ticketPrice = (await deployerContract.ticketPrice()).toString();
+      await deployerContract.buyTicket({value: ticketPrice});
+      const otherContracts = [];
+      for (let i = 1; i < 5; i++) {
+        const otherContract = await ethers.getContract(
+          'TestGame',
+          others[i].address
+        );
+        otherContracts.push(otherContract);
+        await otherContract.buyTicket({value: ticketPrice});
+      }
+      const lastBlock = await ethers.provider.getBlock('latest');
+      await deployerContract.testSetLastAction(lastBlock.timestamp);
+      const arbitraryPlayersOrder = [3, 1, 5, 4, 2];
+      await deployerContract.testSetPlayersOrder(
+        arbitraryPlayersOrder.concat(Array(250).fill(0))
+      );
+      await otherContracts[1].unwrap(0);
+      await advanceTime(10800);
+      await expect(deployerContract.unwrap(1)).to.be.revertedWith(
+        'not your turn'
+      );
+      await expect(otherContracts[3].steal(2, 0, 0)).to.be.revertedWith(
+        'playersSkipped not zero'
+      );
+      await otherContracts[3].steal(2, 0, 1);
+      expect(await deployerContract.swaps(5)).to.be.equal(3);
+      expect(await deployerContract.spaws(3)).to.be.equal(5);
+      await advanceTime(12000);
+      await expect(otherContracts[0].steal(4, 0, 1)).to.be.revertedWith(
+        'cant steal from them again'
+      );
+      await otherContracts[0].steal(4, 1, 1);
+      expect(await deployerContract.swaps(2)).to.be.equal(1);
+      expect(await deployerContract.spaws(1)).to.be.equal(2);
+      // if input 3 (3-1) then give back index 0 in playersOrder
+      // if input 1 (1-1) then give back index 1 in playersOrder
+      // if input 5 (5-1) then give back index 2 in playersOrder
+      const op = Array(256).fill(0);
+      op[0] = 1;
+      op[1] = 4;
+      op[2] = 0;
+      op[3] = 3;
+      op[4] = 2;
+      const tx = await deployerContract.finito(op, 1, 6);
+      const receipt = await tx.wait();
+      // third buyer unwraps 0 -- stolen from
+      // first buyer missed, unwraps second gift -- fifth gift after steal
+      // fifth buyer steals from third buyer - first gift
+      // fourth buyer missed, unwraps fourth gift
+      // second buyer steals from first buyer - second gift
+      const karrekt = [2, 4, 0, 3, 1];
+      for (let i = 0; i < 5; i++) {
+        console.log(receipt.events[i].args.prizeIx.toString());
+        expect(receipt.events[i].args.prizeIx).to.be.equal(karrekt[i]);
       }
     });
   });

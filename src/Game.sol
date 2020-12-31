@@ -191,7 +191,8 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         uint8 from = playersOrder[_from];
         require(sender > 0, "strictly greater than zero sender");
         require(from > 0, "strictly greater than zero from");
-        require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
+        require(currPlayer + missed < 256, "its a pickle, no doubt about it");
+        require(players.addresses[playersOrder[currPlayer + missed]] == players.addresses[sender], "not your order");
         require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(spaws[from] == 0, "cant steal from them again");
         require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
@@ -203,47 +204,40 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         lastAction = uint32(now);
     }
 
-    /// @param orderPlayers - given the index of the player (from players)
-    /// gives their turn number
     /// @param startIx - index from which to start looping the prizes
     /// @param endIx - index on which to end looping the prizes (exclusive)
     /// @dev start and end indices would be useful in case we hit
     /// the block gas limit, or we want to better control our transaction
     /// costs
     function finito(
-        uint8[255] calldata orderPlayers,
+        uint8[256] calldata op,
         uint8 startIx,
         uint8 endIx
     ) external onlyOwner {
         require(startIx > 0, "there is no player at 0");
-        // take into account the steals, the skips and unwraps
-        // distribute the NFT prizes to their rightful owners
-        // players: [0x123, 0x223, 0x465, 0xf21]. First, 0x123 bought, then 0x223 etc.
-        // playersOrder: [4,1,3,2]. 4th buyer goes first, 1st buy goest second, ...
-        // swaps: { 2: 1, 4: 3 }. Second player (0x223) stole from first, and
-        // fourth stole from third. In essence, 2-1 swapped and then 4-3 swapped
         for (uint8 i = startIx; i < endIx; i++) {
-            uint8 prizeIx = 0;
-            uint8 stoleIx = swaps[i];
-            uint8 stealerIx = spaws[i];
+            uint8 playerIx = playersOrder[i - 1];
+            uint8 prizeIx;
+            uint8 stoleIx = swaps[playerIx];
+            uint8 stealerIx = spaws[playerIx];
             if (stoleIx == 0 && stealerIx == 0) {
-                prizeIx = orderPlayers[i] - 1;
-            }
-            if (stoleIx != 0) {
+                prizeIx = playersOrder[i - 1] - 1;
+            } else if (stealerIx != 0) {
+                prizeIx = op[stealerIx - 1];
+            } else {
                 bool end = false;
                 while (!end) {
-                    prizeIx = stoleIx - 1;
+                    prizeIx = stoleIx;
                     stoleIx = swaps[stoleIx];
                     if (stoleIx == 0) {
                         end = true;
                     }
                 }
+                prizeIx = op[prizeIx - 1];
             }
-            if (stealerIx != 0) {
-                prizeIx = orderPlayers[spaws[i]] - 1;
-            }
-            ERC721(nfts[prizeIx].adr).transferFrom(address(this), players.addresses[i], nfts[prizeIx].id);
-            emit PrizeTransfer(players.addresses[i], nfts[prizeIx].adr, nfts[prizeIx].id, prizeIx);
+            // event PrizeTransfer(address to, address nftishka, uint256 id, uint256 prizeIx);
+            emit PrizeTransfer(players.addresses[playerIx], nfts[prizeIx].adr, nfts[prizeIx].id, prizeIx);
+            // emit PrizeTransfer();
         }
     }
 
