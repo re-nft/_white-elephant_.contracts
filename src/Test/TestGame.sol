@@ -110,12 +110,16 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         uint8 missed
     ) external nonReentrant youShallNotPatheth(missed) {
         require(_sender > _from, "cant steal from someone who unwrapped after");
+        // console.log("_sender %s, _from %s", _sender, _from);
         uint8 sender = playersOrder[_sender]; // strictly greater than zero
         uint8 from = playersOrder[_from]; // strictly greater than zero
+        require(sender > 0, "strictly greater than zero sender");
+        require(from > 0, "strictly greater than zero from");
         require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
         require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(spaws[from] == 0, "cant steal from them again");
         require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
+        // console.log("sender %s, from %s", sender, from);
         swaps[sender] = from;
         spaws[from] = sender;
         currPlayer += missed + 1;
@@ -134,6 +138,7 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
         uint8 startIx,
         uint8 endIx
     ) external onlyOwner {
+        require(startIx > 0, "there is no player at 0");
         // take into account the steals, the skips and unwraps
         // distribute the NFT prizes to their rightful owners
         // players: [0x123, 0x223, 0x465, 0xf21]. First, 0x123 bought, then 0x223 etc.
@@ -145,19 +150,50 @@ contract TestGame is Ownable, ERC721Holder, ReentrancyGuard {
             // verify that the prize is correct
             uint8 stoleIx = swaps[i];
             uint8 stealerIx = spaws[i];
-            console.log("stoleIx %s, stealerIx %s", stoleIx, stealerIx);
+            // console.log("--------");
+            // console.log("I am %s", players.addresses[i]);
+            // console.log("stoleIx %s, stealerIx %s", stoleIx, stealerIx);
             if (stoleIx == 0 && stealerIx == 0) {
-                prizeIx = orderPlayers[i];
+                // stole from no-one, means his prize is
+                // his turn number. orderPlayers maps index
+                // of player in players arr to their turn number
+                // thus if players = [a,b,c,d] and we are interested
+                // in player a, at index 0 and
+                // playersOrder is [1,2,3,4]
+                // then orderPlayers is trivially [0,1,2,3]
+                // and so orderPlayers[index of a in players] will give us index in playersOrder
+                // namely 0. i.e. orderPlayers[0] = 0;
+                // and so prizeIx in this case would be 0;
+                // * minus one for playersOrder offset, because it is 1-indexed
+                prizeIx = orderPlayers[i] - 1;
+                // console.log("1 - didnt steal | wasnt stolen from, prizeIx %s", prizeIx);
             }
             // if the player stole
             if (stoleIx != 0) {
-                prizeIx = swaps[i];
+                // need to check if the player that we steal from has stolen himself
+                // prizeIx = orderPlayers[swaps[i]] - 1;
+                bool end = false;
+                while (!end) {
+                    // swaps[i] tells us who we stole from
+                    // we need to follow this link all the
+                    // way to when the address has not stolen from
+                    // we (a) stole from (b), (b) stole from (c), (c) didn't steal
+                    // our prize is that of (c)
+                    prizeIx = stoleIx - 1;
+                    stoleIx = swaps[stoleIx];
+                    if (stoleIx == 0) {
+                        end = true;
+                    }
+                }
+                // console.log("2 - stole | prizeIx %s", prizeIx);
             }
             // if the player was stolen from, then the prize they receive must be from their stealer
             // since i is the index of the player in players, we trivially have
             if (stealerIx != 0) {
-                prizeIx = spaws[i];
+                prizeIx = orderPlayers[spaws[i]] - 1;
+                // console.log("3 - was stolen from | prizeIx %s", prizeIx);
             }
+            // console.log("----");
             // transfer the prize
             // ERC721(nfts[prizeIx].adr).transferFrom(address(this), players.addresses[i], nfts[prizeIx].id);
             emit PrizeTransfer(players.addresses[i], nfts[prizeIx].adr, nfts[prizeIx].id, prizeIx);

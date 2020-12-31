@@ -325,6 +325,7 @@ describe('Game', function () {
       // equal to the players. i.e. each person takes turn as per who bought
       // ticket the earliest
       const {TestGame: g, others} = await setup();
+      // console.log('others', others);
       const ticketPrice = await g.ticketPrice();
       const cs = [];
       for (let i = 0; i < others.length; i++) {
@@ -339,16 +340,59 @@ describe('Game', function () {
       let i = 0;
       const po = Array(255);
       while (i < 255) po[i++] = i;
+      // 1, 2, 3, ..., 255
+      // only 20 players in this example
       await g.testSetPlayersOrder(po);
+      // first one unwraps. His prize is nft at index 0, for his order is 1
       await cs[0].unwrap(0);
-      for (let i = 1; i < cs.length; i++) await cs[i].steal(i, i - 1, 0);
-      const tx = await g.finito(po, 0, cs.length);
+      // the other ones steal
+      // the first stealer steals from the above, so his prize is nft at index 0
+      // the prize of the first player is now at index 1
+      // the second stealer steals from the first one, so his prize is nft at index 0
+      // the prize of the first stealer is now at index 2
+      // here is the sequence: [1,2,3,...,19,0]
+      for (let i = 1; i < cs.length; i++) {
+        // playersOrder = [1, 2, 3, ..., 20]
+        // steal(1, 0, 0) means that playersOrder[1]
+        // is stealing from playersOrder[0].
+        // i.e. players[2] is stealing
+        // from players[1]. recall, players[0] is empty, thus 255 players
+        // and so we expect swaps[i + 1] = i;
+        // also swaps[i + 1] = i iff spaws[i] = i + 1;
+        // in other words
+        // player at index i + 1 stole from player at index i
+        // iff
+        // player at index i was stolen by player at index i + 1
+        await cs[i].steal(i, i - 1, 0);
+        const swapsI = await cs[i].swaps(i + 1);
+        expect(swapsI).to.be.equal(i);
+        const spawsI = await cs[i].spaws(i);
+        expect(spawsI).to.be.equal(i + 1);
+      }
+
+      // op gives you index of a player (from players arr) in playersOrder
+      // e.g. imagine playersOrder is [1,4,2,3]
+      //                   players is [a,b,c,d]
+      // then orderPlayers (op) is    [0,2,3,1]
+      // following up on this example, you have address a, at index 0
+      // what index in playersOrder points to it? the one at index 0
+      // you have address b, at index 1, what index in po points to it?
+      // 2
+      // you have address c, at index 2, what index in po pints to it?
+      // 3
+      // In the case when playersOrder = [1,2,3,4,...,20]
+      // op is trivially [0,...,19]
+      const op = po.map((v) => v - 1);
+      const tx = await g.finito(op, 1, cs.length + 1);
       const {events} = await tx.wait();
+      // ensure the prizes are correctly distributed
       for (let i = 0; i < events.length; i++) {
         if (i === events.length - 1) {
           expect(events[i].args.prizeIx).to.equal(0);
           break;
         }
+        // nft indices
+        // [1, 2, 3, ..., 19, 0]
         const event = events[i];
         const {prizeIx} = event.args;
         expect(prizeIx).to.equal(i + 1);

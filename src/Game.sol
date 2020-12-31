@@ -31,6 +31,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         address adr;
         uint256 id;
     }
+    // ! there is no player at index 0 here. Starts from index 1
     struct Players {
         address[256] addresses;
         mapping(address => bool) contains;
@@ -166,7 +167,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         require(players.numPlayers < 256, "total number of players reached");
         require(players.contains[msg.sender] == false, "cant buy more");
         players.contains[msg.sender] = true;
-        // at 0-index we have address(0)
+        // !!! at 0-index we have address(0)
         players.addresses[players.numPlayers + 1] = msg.sender;
         players.numPlayers++;
     }
@@ -188,11 +189,15 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         require(_sender > _from, "cant steal from someone who unwrapped after");
         uint8 sender = playersOrder[_sender];
         uint8 from = playersOrder[_from];
+        require(sender > 0, "strictly greater than zero sender");
+        require(from > 0, "strictly greater than zero from");
         require(players.addresses[playersOrder[currPlayer]] == players.addresses[sender], "not your order");
         require(players.addresses[sender] == msg.sender, "sender is not valid");
         require(spaws[from] == 0, "cant steal from them again");
         require(swaps[sender] == 0, "you cant steal again. You can in Verkhovna Rada.");
+        // sender stole from
         swaps[sender] = from;
+        // from was stolen by sender
         spaws[from] = sender;
         currPlayer += missed + 1;
         lastAction = uint32(now);
@@ -210,6 +215,7 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         uint8 startIx,
         uint8 endIx
     ) external onlyOwner {
+        require(startIx > 0, "there is no player at 0");
         // take into account the steals, the skips and unwraps
         // distribute the NFT prizes to their rightful owners
         // players: [0x123, 0x223, 0x465, 0xf21]. First, 0x123 bought, then 0x223 etc.
@@ -218,22 +224,24 @@ contract Game is Ownable, ERC721Holder, VRFConsumerBase, ReentrancyGuard {
         // fourth stole from third. In essence, 2-1 swapped and then 4-3 swapped
         for (uint8 i = startIx; i < endIx; i++) {
             uint8 prizeIx = 0;
-            // verify that the prize is correct
             uint8 stoleIx = swaps[i];
             uint8 stealerIx = spaws[i];
             if (stoleIx == 0 && stealerIx == 0) {
-                prizeIx = orderPlayers[i];
+                prizeIx = orderPlayers[i] - 1;
             }
-            // if the player stole
             if (stoleIx != 0) {
-                prizeIx = swaps[i];
+                bool end = false;
+                while (!end) {
+                    prizeIx = stoleIx - 1;
+                    stoleIx = swaps[stoleIx];
+                    if (stoleIx == 0) {
+                        end = true;
+                    }
+                }
             }
-            // if the player was stolen from, then the prize they receive must be from their stealer
-            // since i is the index of the player in players, we trivially have
             if (stealerIx != 0) {
-                prizeIx = spaws[i];
+                prizeIx = orderPlayers[spaws[i]] - 1;
             }
-            // transfer the prize
             ERC721(nfts[prizeIx].adr).transferFrom(address(this), players.addresses[i], nfts[prizeIx].id);
             emit PrizeTransfer(players.addresses[i], nfts[prizeIx].adr, nfts[prizeIx].id, prizeIx);
         }
