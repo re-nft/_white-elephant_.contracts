@@ -3,6 +3,7 @@ import {HardhatUserConfig} from 'hardhat/types';
 import 'hardhat-deploy';
 import 'hardhat-deploy-ethers';
 import 'hardhat-gas-reporter';
+import '@nomiclabs/hardhat-etherscan';
 import {node_url, accounts} from './utils/network';
 
 const config: HardhatUserConfig = {
@@ -39,6 +40,9 @@ const config: HardhatUserConfig = {
   },
   paths: {
     sources: 'src',
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY,
   },
   gasReporter: {
     currency: 'USD',
