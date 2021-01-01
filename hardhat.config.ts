@@ -4,6 +4,9 @@ import 'hardhat-deploy';
 import 'hardhat-deploy-ethers';
 import 'hardhat-gas-reporter';
 import '@nomiclabs/hardhat-etherscan';
+import '@symfoni/hardhat-react';
+import 'hardhat-typechain';
+import '@typechain/ethers-v5';
 import {node_url, accounts} from './utils/network';
 
 const config: HardhatUserConfig = {

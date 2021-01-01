@@ -616,6 +616,11 @@
   resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.8.1.tgz#1b606578af86b9ad10755409804a6ba83f9ce8a4"
   integrity sha512-DF7H6T8I4lo2IZOE2NZwt3631T8j1gjpQLjmvY2xBNK50c4ltslR4XPKwT6RkeSd4+xCAK0GHC/k7sbRDBE4Yw==
 
+"@symfoni/hardhat-react@^0.1.6":
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/@symfoni/hardhat-react/-/hardhat-react-0.1.6.tgz#c009c9c51a7b91b7ebf0bf5c8d9f74ee9907b79b"
+  integrity sha512-ns/ZDPGNu72UcMpVTpFN8zalS/d+cuhR+0NRfeARGyZDNGAzS7A7EOIlgxOX4D5qCdM0RwTjYLnizURZ+3g3Lw==
+
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@szmarczak/http-timer/-/http-timer-1.1.2.tgz#b1665e2c461a2cd92f4c1bbf50d5454de0d4b421"
@@ -724,6 +729,11 @@
     strip-ansi "^4.0.0"
     strip-indent "^2.0.0"
     super-split "^1.1.0"
+
+"@typechain/ethers-v5@^5.0.0":
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/@typechain/ethers-v5/-/ethers-v5-5.0.0.tgz#6c91766b76c19886cf2c4833ded09611e117f92c"
+  integrity sha512-SnLnq6BCq2NBgm5xsQP8kRIawJ7gppLux8EOMb2ceoB5EuoW87AOyi6r1J5LTYe65/J59HjOVtaGCqsO+38Xrw==
 
 "@types/bn.js@^4.11.3", "@types/bn.js@^4.11.4", "@types/bn.js@^4.11.5":
   version "4.11.6"
@@ -4642,6 +4652,11 @@ hardhat-gas-reporter@^1.0.1:
   integrity sha512-YC+SCYIkBdRtISNbisU2BwDSelUdCrIKRsJXt3M9Jw1VF5CmtSZb8VuuOc2Zl4AMcEV2jEy6ZuAksYomPiApYQ==
   dependencies:
     eth-gas-reporter "^0.2.19"
+
+hardhat-typechain@^0.3.4:
+  version "0.3.4"
+  resolved "https://registry.yarnpkg.com/hardhat-typechain/-/hardhat-typechain-0.3.4.tgz#6d7d86184152b5a3c83bde0fbbb26224b6fbfd70"
+  integrity sha512-oI9YSutDfZnRlAV1bYTpLkBHw4rkhz9JDWAEXz2PR34ylpgLWxPFbPiHT5QXadGTlBqJUAT6JSTxCK1kADMkjA==
 
 hardhat@^2.0.4:
   version "2.0.4"
