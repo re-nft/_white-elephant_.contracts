@@ -21,7 +21,7 @@
     "@ethereum-waffle/chai": "^3.0.2",
     "@ethersproject/wallet": "^5.0.5",
     "@nomiclabs/hardhat-etherscan": "^2.1.0",
-    "@openzeppelin/contracts": "^3.2.1-solc-0.6",
+    "@openzeppelin/contracts": "^3.4.2",
     "@symfoni/hardhat-react": "^0.1.6",
     "@types/chai": "^4.2.11",
     "@types/mocha": "^8.0.2",
